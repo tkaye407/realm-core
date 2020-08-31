@@ -221,8 +221,6 @@ void Columns<Link>::evaluate(size_t index, ValueBase& destination)
 {
     // Destination must be of Key type. It only makes sense to
     // compare keys with keys
-    REALM_ASSERT_DEBUG(dynamic_cast<Value<ObjKey>*>(&destination));
-    auto d = static_cast<Value<ObjKey>*>(&destination);
     std::vector<ObjKey> links = m_link_map.get_links(index);
 
     if (m_link_map.only_unary_links()) {
@@ -230,10 +228,12 @@ void Columns<Link>::evaluate(size_t index, ValueBase& destination)
         if (!links.empty()) {
             key = links[0];
         }
-        d->init(false, 1, key);
+        destination.init(false, 1);
+        destination.set(0, key);
     }
     else {
-        d->init(true, links);
+        destination.init(true, links.size());
+        destination.set(links.begin(), links.end());
     }
 }
 
@@ -252,26 +252,27 @@ void ColumnListBase::set_cluster(const Cluster* cluster)
     }
 }
 
-void ColumnListBase::get_lists(size_t index, Value<ref_type>& destination, size_t nb_elements)
+void ColumnListBase::get_lists(size_t index, Value<int64_t>& destination, size_t nb_elements)
 {
     if (m_link_map.has_links()) {
         std::vector<ObjKey> links = m_link_map.get_links(index);
         auto sz = links.size();
 
         if (m_link_map.only_unary_links()) {
-            ref_type val = 0;
+            int64_t val = 0;
             if (sz == 1) {
                 const Obj obj = m_link_map.get_target_table()->get_object(links[0]);
-                val = to_ref(obj._get<int64_t>(m_column_key.get_index()));
+                val = obj._get<int64_t>(m_column_key.get_index());
             }
-            destination.init(false, 1, val);
+            destination.init(false, 1);
+            destination.set(0, val);
         }
         else {
             destination.init(true, sz);
             for (size_t t = 0; t < sz; t++) {
                 const Obj obj = m_link_map.get_target_table()->get_object(links[t]);
-                ref_type val = to_ref(obj._get<int64_t>(m_column_key.get_index()));
-                destination.m_storage.set(t, val);
+                int64_t val = obj._get<int64_t>(m_column_key.get_index());
+                destination.set(t, val);
             }
         }
     }
@@ -281,7 +282,7 @@ void ColumnListBase::get_lists(size_t index, Value<ref_type>& destination, size_
         destination.init(false, rows);
 
         for (size_t t = 0; t < rows; t++) {
-            destination.m_storage.set(t, to_ref(m_leaf_ptr->get(index + t)));
+            destination.set(t, from_ref(m_leaf_ptr->get(index + t)));
         }
     }
 }

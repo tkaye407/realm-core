@@ -19,6 +19,7 @@
 #include <realm/mixed.hpp>
 #include <realm/decimal128.hpp>
 #include <realm/unicode.hpp>
+#include <realm/column_type_traits.hpp>
 
 namespace realm {
 
@@ -138,7 +139,7 @@ inline int compare_long_to_double(int64_t lhs, double rhs)
 bool Mixed::types_are_comparable(const Mixed& lhs, const Mixed& rhs)
 {
     if (lhs.m_type == rhs.m_type)
-        return true;
+        return lhs.m_type != 0;
 
     if (lhs.is_null() || rhs.is_null())
         return false;
@@ -288,6 +289,28 @@ int Mixed::compare(const Mixed& b) const
     // This will also handle the case where null values are considered lower than all other values
     return (m_type > b.m_type) ? 1 : -1;
 }
+
+template <class T>
+T Mixed::export_to_type() const noexcept
+{
+    REALM_ASSERT(m_type);
+    switch (get_type()) {
+        case type_Int:
+            return T(int_val);
+        case type_Float:
+            return T(float_val);
+        case type_Double:
+            return T(double_val);
+        default:
+            REALM_ASSERT(false);
+            break;
+    }
+    return T();
+}
+
+template int64_t Mixed::export_to_type<int64_t>() const noexcept;
+template float Mixed::export_to_type<float>() const noexcept;
+template double Mixed::export_to_type<double>() const noexcept;
 
 size_t Mixed::hash() const
 {

@@ -209,8 +209,10 @@ TEST(Mixed_Compare)
     CHECK(Mixed(nan("123")) < 5);
 
     CHECK(Mixed("Hello") == Mixed(BinaryData("Hello")));
-    CHECK(Mixed::types_are_comparable(Mixed(), Mixed()));
-    CHECK(Mixed() == Mixed());
+
+    // Generally nulls are not comparable - it only goes for equal/not equal
+    CHECK(!Mixed::types_are_comparable(Mixed(), Mixed()));
+    CHECK(!Mixed::types_are_comparable(Mixed(), Mixed(5)));
 }
 
 #endif // TEST_ARRAY_VARIANT
