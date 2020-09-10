@@ -4205,4 +4205,52 @@ TEST_IF(Shared_LargeFile, TEST_DURATION > 0 && !REALM_ANDROID)
     }
 }
 
+TEST(Shared_ManyColumns)
+{
+    SHARED_GROUP_TEST_PATH(path);
+    DBOptions options;
+    options.durability = DBOptions::Durability::MemOnly;
+    DBRef db = DB::create(path, false, options);
+
+    auto tr = db->start_write();
+
+    auto foo = tr->add_table("foo");
+    // Create more than 16 columns. The cluster array will always have a minimum
+    // size of 128, so if number of columns is lower than 17, then the array will
+    // always be able to hold 64 bit values.
+    for (size_t i = 0; i < 50; i++) {
+        std::string name = "Prop" + util::to_string(i);
+        foo->add_column(type_Int, name);
+    }
+    auto bar = tr->add_table("bar");
+
+    // Create enough objects to have a multi level cluster
+    for (size_t i = 0; i < 400; i++) {
+        foo->create_object();
+    }
+
+    tr->commit();
+    tr = db->start_write();
+    foo = tr->get_table("foo");
+    bar = tr->get_table("bar");
+
+    std::vector<ObjKey> keys;
+    foo->create_objects(10000, keys);
+
+    for (size_t i = 0; i < 10000; i++) {
+        auto obj = foo->get_object(keys[i]);
+        for (auto col : foo->get_column_keys()) {
+            obj.set(col, 500);
+        }
+    }
+    auto obj = foo->begin();
+    for (auto col : foo->get_column_keys()) {
+        obj->set(col, 500);
+    }
+    tr->commit();
+
+    auto rt = db->start_read();
+    rt->verify();
+}
+
 #endif // TEST_SHARED
