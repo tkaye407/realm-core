@@ -565,7 +565,9 @@ inline void out_floats(std::ostream& out, T value)
     out.precision(old);
 }
 
-void out_mixed(std::ostream& out, const Mixed& val)
+
+
+void out_mixed_json(std::ostream& out, const Mixed& val)
 {
     if (val.is_null()) {
         out << "null";
@@ -625,9 +627,88 @@ void out_mixed(std::ostream& out, const Mixed& val)
     }
 }
 
+void out_mixed_xjson(std::ostream& out, const Mixed& val)
+{
+    if (val.is_null()) {
+        out << "null";
+        return;
+    }
+    switch (val.get_type()) {
+        case type_Int:
+            out << "{\"$numberLong\": \"";
+            out << val.get<Int>();
+            out << "\"}";
+            break;
+        case type_Bool:
+            out << (val.get<bool>() ? "true" : "false");
+            break;
+        case type_Float:
+            out << "{\"$numberDouble\": \"";
+            out_floats<float>(out, val.get<float>());
+            out << "\"}";
+            break;
+        case type_Double:
+            out << "{\"$numberDouble\": \"";
+            out_floats<double>(out, val.get<double>());
+            out << "\"}";
+            break;
+        case type_String: {
+            out << "\"";
+            std::string str = val.get<String>();
+            size_t p = str.find_first_of(to_be_escaped);
+            while (p != std::string::npos) {
+                char c = str[p];
+                auto found = strchr(to_be_escaped, c);
+                REALM_ASSERT(found);
+                out << str.substr(0, p) << '\\' << encoding[found - to_be_escaped];
+                str = str.substr(p + 1);
+                p = str.find_first_of(to_be_escaped);
+            }
+            out << str << "\"";
+            break;
+        }
+        case type_Binary: {
+            out << "{\"$binary\": {\"base64\": \"";
+            auto bin = val.get<Binary>();
+            const char* start = bin.data();
+            const size_t len = bin.size();
+            util::StringBuffer encode_buffer;
+            encode_buffer.resize(util::base64_encoded_size(len));
+            util::base64_encode(start, len, encode_buffer.data(), encode_buffer.size());
+            out << encode_buffer.str();
+            out << "\"}}";
+            break;
+        }
+        case type_Timestamp:
+            out << "\"";
+            out << val.get<Timestamp>();
+            out << "\"";
+            break;
+        case type_Link:
+        case type_LinkList:
+        case type_OldDateTime:
+        case type_OldMixed:
+        case type_OldTable:
+            break;
+    }
+}
+
+void out_mixed(std::ostream& out, const Mixed& val, size_t output_format)
+{
+    switch (output_format) {
+        case 1: {
+            out_mixed_xjson(out, val);
+            break;
+        }
+
+    }
+    out_mixed_json(out, val);
+} 
+
 } // anonymous namespace
 
-void ConstObj::to_json(std::ostream& out, size_t link_depth, std::map<std::string, std::string>& renames,
+void ConstObj::to_json(std::ostream& out, size_t link_depth,
+                       std::map<std::string, std::string>& renames,
                        std::vector<ColKey>& followed) const
 {
     StringData name = "_key";
@@ -681,7 +762,7 @@ void ConstObj::to_json(std::ostream& out, size_t link_depth, std::map<std::strin
                     if (i > 0)
                         out << ",";
 
-                    out_mixed(out, list->get_any(i));
+                    out_mixed(out, list->get_any(i), 0);
                 }
                 out << "]";
             }
@@ -706,7 +787,7 @@ void ConstObj::to_json(std::ostream& out, size_t link_depth, std::map<std::strin
                 }
             }
             else {
-                out_mixed(out, get_any(ck));
+                out_mixed(out, get_any(ck), 0);
             }
         }
     }

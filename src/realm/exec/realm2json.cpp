@@ -8,8 +8,13 @@ int main(int argc, char const* argv[])
         std::string path = argv[1];
         std::map<std::string, std::string> renames;
         size_t link_depth = 0;
+        size_t format = false;
         if (argc > 2) {
             link_depth = strtol(argv[2], nullptr, 0);
+            
+            if (argc > 3) {
+                format = strtol(argv[3], nullptr, 0);
+            }
         }
         try {
             // First we try to open in read_only mode. In this way we can also open
